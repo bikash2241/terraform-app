@@ -1,0 +1,5 @@
+region = "us-east-1"
+instance_type = "t2.micro"
+key =  "devts"
+project = "devts"
+hz_record="www.xyz.com"
