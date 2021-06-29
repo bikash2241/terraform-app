@@ -13,18 +13,18 @@ terraform {
 module "assignment5_vpc"  {
 
 source = "../modules/vpc"
-region = "us-east-1"
-vpc_cidr = "172.32.0.0/16"
-instance_tenancy = "default"
-project = "devts"
-vpc_pub_cidr_1a = "172.32.1.0/24"
-pub_sub_availability_zone_1a="us-east-1a"
-vpc_pub_cidr_1b = "172.32.2.0/24"
-pub_sub_availability_zone_1b="us-east-1b"
-vpc_pvt_cidr_1a = "172.32.3.0/24"
-pvt_sub_availability_zone_1a="us-east-1a"
-vpc_pvt_cidr_1b = "172.32.4.0/24"
-pvt_sub_availability_zone_1b="us-east-1b"
+region = var.region
+vpc_cidr = var.vpc_cidr
+instance_tenancy = var.instance_tenancy
+project = var.project
+vpc_pub_cidr_1a = var.vpc_pub_cidr_1a
+pub_sub_availability_zone_1a=var.pub_sub_availability_zone_1a
+vpc_pub_cidr_1b = var.vpc_pub_cidr_1b
+pub_sub_availability_zone_1b=var.pub_sub_availability_zone_1b
+vpc_pvt_cidr_1a = var.vpc_pvt_cidr_1a
+pvt_sub_availability_zone_1a=var.pvt_sub_availability_zone_1a
+vpc_pvt_cidr_1b = var.vpc_pvt_cidr_1b
+pvt_sub_availability_zone_1b=var.pvt_sub_availability_zone_1b
 
 }
 
@@ -32,41 +32,40 @@ pvt_sub_availability_zone_1b="us-east-1b"
 module "assignment5_route53"  {
 
 source = "../modules/route53"
-region = "us-east-1"
-hosted_zone="xyz.com"
-hz_record="www.xyz.com"
+region = var.region
+hosted_zone=var.hosted_zone
 
 }
 
 module "assignment5_s3"  {
 
 source = "../modules/s3"
-region = "us-east-1"
-project = "devts"
-bucket_name="devtsbkt2241"
-s3_acl="private"
-key_name="index.html"
-source_path="C:\\Software\\Data\\Important\\Devops\\Valaxy_AWS\\terraform-code\\modules\\s3\\index.html"
+region = var.region
+project = var.project
+bucket_name=var.bucket_name
+s3_acl=var.s3_acl
+key_name=var.s3_key_name
+source_path=var.source_path
 
 }
 
 module "assignment5_iamrole"  {
 
 source = "../modules/iamrole"
-region = "us-east-1"
-role_name="SSM-S3-role2-EC2"
-EC2_to_SSM="AmazonEC2RoleforSSM"
-EC2_to_S3="AmazonS3FullAccess"
+region = var.region
+role_name=var.role_name
+EC2_to_SSM=var.EC2_to_SSM
+EC2_to_S3=var.EC2_to_S3
 }
 
 
 resource "aws_security_group" "devts_allow_ssh_http" {
-  name        = "devts_allow_ssh_http"
-  description = "allow 80 & 22 ports"
+  name        = var.sg_name
+  description = var.sg_description
   vpc_id      = module.assignment5_vpc.vpc_id
 
   ingress {
-    description      = "ssh to ec2"
+    description      = "ssh port"
     from_port        = 22
     to_port          = 22
     protocol         = "tcp"
@@ -75,7 +74,7 @@ resource "aws_security_group" "devts_allow_ssh_http" {
   }
 
   ingress {
-    description      = "TLS from VPC"
+    description      = "http port"
     from_port        = 80
     to_port          = 80
     protocol         = "tcp"
@@ -90,10 +89,10 @@ resource "aws_security_group" "devts_allow_ssh_http" {
 }
 
 resource "aws_instance" "devts_priv_instace1a" {
-  ami           = "ami-0ab4d1e9cf9a1215a"
+  ami = var.ec2_ami
   instance_type = var.instance_type
   iam_instance_profile=module.assignment5_iamrole.ec2_profile_name
-  user_data="${file("user_data.sh")}"
+  user_data="${file(var.user_data)}"
   subnet_id = module.assignment5_vpc.devts_pvt_subnet_1a
   key_name = var.key
 
@@ -103,10 +102,10 @@ resource "aws_instance" "devts_priv_instace1a" {
 }
 
 resource "aws_instance" "devts_priv_instace1b" {
-  ami           = "ami-0ab4d1e9cf9a1215a"
+  ami = var.ec2_ami
   instance_type = var.instance_type
   iam_instance_profile=module.assignment5_iamrole.ec2_profile_name
-  user_data="${file("user_data.sh")}"
+  user_data="${file(var.user_data)}"
   subnet_id = module.assignment5_vpc.devts_pvt_subnet_1b
   key_name = var.key
 
@@ -127,34 +126,34 @@ resource "aws_network_interface_sg_attachment" "sg_attachment_instace1b" {
 
 
 resource "aws_lb_target_group" "devts_tg" {
-  name     = "devts-tg"
-  port     = 80
-  protocol = "TCP"
+  name     = var.tg_name
+  port     = var.tg_port
+  protocol = var.tg_protocol
   vpc_id   = module.assignment5_vpc.vpc_id
 
   health_check {
-    path = "/index.html"
-    port = 80
-    protocol = "HTTP"
-    healthy_threshold = 3
+    path = var.tg_hc_path
+    port = var.tg_hc_port
+    protocol = var.tg_hc_protocol
+    healthy_threshold = var.tg_hc_healthy_threshold
   }
 }
 
 resource "aws_lb_target_group_attachment" "devts_tg_instace1a" {
   target_group_arn = aws_lb_target_group.devts_tg.arn
   target_id        = aws_instance.devts_priv_instace1a.id
-  port             = 80
+  port             = var.tg_port
 }
 resource "aws_lb_target_group_attachment" "devts_tg_instace1b" {
   target_group_arn = aws_lb_target_group.devts_tg.arn
   target_id        = aws_instance.devts_priv_instace1b.id
-  port             = 80
+  port             = var.tg_port
 }
 
 resource "aws_lb" "devts_nlb" {
-  name               = "devts-nlb"
-  internal           = false
-  load_balancer_type = "network"
+  name               = var.lb_name
+  internal           = var.lb_internal
+  load_balancer_type = var.lb_load_balancer_type
   subnet_mapping {
     subnet_id     = module.assignment5_vpc.devts_pub_subnet_1a
   }
@@ -170,11 +169,11 @@ resource "aws_lb" "devts_nlb" {
 
 resource "aws_lb_listener" "devts_nlb_listner" {
   load_balancer_arn = aws_lb.devts_nlb.arn
-  port              = "80"
-  protocol          = "TCP"
+  port              = var.lb_listener_port
+  protocol          = var.lb_listener_protocol
 
   default_action {
-    type             = "forward"
+    type             = var.lb_default_action_type
     target_group_arn = aws_lb_target_group.devts_tg.arn
   }
 }
@@ -182,7 +181,7 @@ resource "aws_lb_listener" "devts_nlb_listner" {
 resource "aws_route53_record" "www_simple_routing_nlb" {
   zone_id = module.assignment5_route53.devts_hosted_zone_id
   name    = var.hz_record
-  type    = "A"
+  type    = var.route53_record_type
   alias {
     name                   = aws_lb.devts_nlb.dns_name
     zone_id                = aws_lb.devts_nlb.zone_id
